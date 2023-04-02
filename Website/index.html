@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Thingspeak Chart Display</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.9.3/Chart.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        $(document).ready(function () {
+            var apiKey = "E9QC3OZD4EMJLG60";
+            var apiUrl = "https://api.thingspeak.com/channels/2091496/feeds.json?api_key=" + apiKey + "&results=10";
+            $.getJSON(apiUrl, function (data) {
+                var labels = [];
+                var datasets = [];
+                for (var i = 1; i <= 8; i++) {
+                    var values = [];
+                    for (var j = 0; j < data.feeds.length; j++) {
+                        labels.push(data.feeds[j].created_at);
+                        values.push(data.feeds[j]["field" + i]);
+                    }
+                    datasets.push({
+                        label: "Value ",
+                        data: values,
+                        fill: true,
+                        borderColor: "rgb(" + (i * 30) + ", " + (i * 30) + ", " + (i * 30) + ")",
+                        tension: 0.1
+                    });
+                }
+                var ctx1 = document.getElementById("myChart1").getContext("2d");
+                var myChart1 = new Chart(ctx1, {
+                    type: "line",
+                    data: {
+                        labels: labels,
+                        datasets: [datasets[0]]
+                    },
+                    options: {
+                        title: {
+                            display: false,
+                            text: "Temperature Monitor"
+                        },
+                        scales: {
+                            yAxes: [{
+                                ticks: {
+                                    beginAtZero: false,
+                                    suggestedMax: 100
+                                }
+                            }]
+                        }
+                    }
+                });
+                var ctx2 = document.getElementById("myChart2").getContext("2d");
+                var myChart2 = new Chart(ctx2, {
+                    type: "line",
+                    data: {
+                        labels: labels,
+                        datasets: [datasets[1]]
+                    },
+                    options: {
+                        title: {
+                            display: false,
+                            text: "Humidity Monitor"
+                        },
+                        scales: {
+                            yAxes: [{
+                                ticks: {
+                                    beginAtZero: false,
+                                    suggestedMax: 100
+                                }
+                            }]
+                        }
+                    }
+                });
+                var ctx3 = document.getElementById("myChart3").getContext("2d");
+                var myChart3 = new Chart(ctx3, {
+                    type: "line",
+                    data: {
+                        labels: labels,
+                        datasets: [datasets[2]]
+                    },
+                    options: {
+                        title: {
+                            display: false,
+                            text: "Light Intensity Monitor"
+                        },
+                        scales: {
+                            yAxes: [{
+                                ticks: {
+                                    beginAtZero: false,
+                                    suggestedMax: 100
+                                }
+                            }]
+                        }
+                    }
+                });
+                // Repeat for other charts
+            });
+
+        });
+    </script>
+    <style>
+        canvas {
+            width: 400px;
+            height: 200px;
+            margin-bottom: 30px;
+        }
+
+        .custom-label {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 5px;
+            margin-right: 10px;
+        }
+        div{
+            width: 40%;
+            height: 30%;
+            margin-bottom: 100px;
+            display: flex;
+        }
+    </style>
+</head>
+<body>
+<h1 style="text-align: center">Home Control and Monitoring System</h1>
+<div>
+    <h2 class="custom-label">Temperature Monitor</h2>
+    <canvas id="myChart1"></canvas>
+    <h2 class="custom-label">Humidity Monitor</h2>
+    <canvas id="myChart2"></canvas>
+</div>
+<div>
+    <h2 class="custom-label">Light Intensity Monitor</h2>
+    <canvas id="myChart3"></canvas>
+</div>
+<!-- Repeat for other charts -->
+</body>
+<footer style="text-align: center; background-color: #3333;color: black;padding: 20px">Developed By - <a href="https://github.com/tranthanhtruc413" style="color: blue;">Tran Thanh Truc</a> and <a>Le Minh Huy</a></footer>
+</html>
