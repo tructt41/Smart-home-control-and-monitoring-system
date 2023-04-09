@@ -1,88 +1,129 @@
-#include <DHT.h>
+#include <PubSubClient.h>
+#include <SPI.h>
 #include <ESP8266WiFi.h>
-#include <WiFiClient.h>
-#include <WiFiUdp.h>
-#include <ThingSpeak.h>
-#include <BH1750.h>
+#include <Adafruit_Sensor.h>
+#include <DHT.h>
 #include <Wire.h>
+#include <BH1750.h>
 
-#define DHTPIN  D6
+#define TOKEN "ESP8266_MCU"
+#define DHTPIN 2
 #define DHTTYPE DHT22
-DHT dht(DHTPIN, DHTTYPE);
-
-#define BH1750_ADDRESS 0x23
-BH1750 lightMeter;
+#define LedPin 14
 
 const char* ssid = "ESP8266_IOT";
 const char* password = "ESP8266_IOT";
-const char* server = "api.thingspeak.com";
-const char* apiKey = "2SJUIEQIRZMXE39P";
-unsigned long myChannelNumber = 2091496;
+const char mqtt_server[] = "thingsboard.cloud";
+const char publishTopic[] = "v1/devices/me/telemetry";
 
-WiFiClient client;
+WiFiClient mkr1010Client;
+PubSubClient client(mkr1010Client);
+long lastData = 0;
+DHT dht(DHTPIN, DHTTYPE);
+BH1750 lightMeter;
+int automation;
+void setup_wifi() {
 
-void setup() {
-  Serial.begin(9600);
-  dht.begin();
-  Wire.begin();
-  lightMeter.begin();
-  WiFi.begin(ssid, password);
+  delay(10);
+  Serial.println();
   Serial.print("Connecting to ");
-  Serial.print(ssid);
+  Serial.println(ssid);
+  WiFi.begin(ssid, password);
+
   while (WiFi.status() != WL_CONNECTED) {
+
     delay(500);
     Serial.print(".");
   }
+
+  randomSeed(micros());
   Serial.println("");
   Serial.println("WiFi connected");
+  Serial.print("IP address: ");
+  Serial.println(WiFi.localIP());
+}
+
+void reconnect() {
+
+  while (!client.connected()) {
+
+    Serial.print("Attempting MQTT connection ....");
+
+    if (client.connect("ClientID", TOKEN, NULL)) {
+
+      Serial.println("Connected to MQTT Broker");
+      digitalWrite(LED_BUILTIN, HIGH);
+    }
+
+    else {
+      Serial.print("failed, rc=");
+      Serial.print(client.state());
+      Serial.println("try again in 5 second");
+      digitalWrite(LED_BUILTIN, LOW);
+      delay(5000);
+    }
+  }
+}
+
+void setup() {
+
+  pinMode(5, OUTPUT);
+  pinMode(LedPin, OUTPUT);
+  pinMode(LED_BUILTIN, OUTPUT);
+  Wire.begin();  //(SDA, SCL);
+  lightMeter.begin();
+  Serial.begin(9600);
+  dht.begin();
+  setup_wifi();
+  client.setServer(mqtt_server, 1883);
+  automation = 0;
 }
 
 void loop() {
-  float h = dht.readHumidity();
+
+  if (!client.connected()) {
+    reconnect();
+  }
+
+  client.loop();
+
   float t = dht.readTemperature();
-  uint16_t lux = lightMeter.readLightLevel();
-  if (isnan(h) || isnan(t) || isnan(lux)) {
-    Serial.println("Failed to read from sensors!");
+  float h = dht.readHumidity();
+  uint16_t l = lightMeter.readLightLevel();
+  if (l >= 10) {
+    automation = 0;
+    digitalWrite(LedPin, LOW);
+  } else {
+    automation = 1;
+    digitalWrite(LedPin, HIGH);
+  }
+  if (isnan(h) || isnan(t)) {
+    Serial.println("Failed to read from DHT sensor");
     return;
   }
-  Serial.print("Humidity: ");
-  Serial.print(h);
-  Serial.print(" %\t");
-  Serial.print("Temperature: ");
-  Serial.print(t);
-  Serial.print(" *C\t");
-  Serial.print("Light: ");
-  Serial.print(lux);
-  Serial.println(" lx");
-  if (client.connect(server, 80)) {
-    String postStr = String(apiKey);
-    postStr += "&field1=";
-    postStr += String(t);
-    postStr += "&field2=";
-    postStr += String(h);
-    postStr += "&field3=";
-    postStr += String(lux);
-    postStr += "\r\n\r\n";
-    client.print("POST /update HTTP/1.1\n");
-    client.print("Host: api.thingspeak.com\n");
-    client.print("Connection: close\n");
-    client.print("Content-Type: application/x-www-form-urlencoded\n");
-    client.print("Content-Length: ");
-    client.print(postStr.length());
-    client.print("\n");
-    client.print("X-THINGSPEAKAPIKEY: " + String(apiKey) + "\n");
-    client.print("\n");
-    client.print(postStr);
-    Serial.print("Temperature: ");
-    Serial.print(t);
-    Serial.print(" *C\t");
-    Serial.print("Humidity: ");
-    Serial.print(h);
-    Serial.print(" %\t");
-    Serial.print("Light: ");
-    Serial.print(lux);
-    Serial.println(" lx\t");
+  String ledstate = String(automation);
+  String temperature = String(t);
+  String humidity = String(h);
+  String intensity = String(l);
+
+  String payload = "{\"temperature\":";
+  payload += temperature;
+  payload += ",\"humidity\":";
+  payload += humidity;
+  payload += ",\"light_intensity\":";
+  payload += intensity;
+  payload += ",\"led_state\":";
+  payload += ledstate;
+  payload += "}";
+
+  char attributes[1000];
+  long now = millis();
+
+  if (now - lastData > 5000) {
+
+    lastData = now;
+    payload.toCharArray(attributes, 1000);
+    client.publish(publishTopic, attributes);
+    Serial.println(attributes);
   }
-  client.stop();
-  delay(150000);
 }
