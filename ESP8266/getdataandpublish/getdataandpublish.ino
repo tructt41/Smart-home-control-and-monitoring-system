@@ -211,6 +211,10 @@ void loop() {
     Serial.println("Failed to read from DHT sensor");
     return;
   }
+    if (l > 2000) {
+    Serial.println("Failed to read from Bh1750 sensor");
+    return;
+  }
   String ledstate = String(automation);
   String temperature = String(t);
   String humidity = String(h);
