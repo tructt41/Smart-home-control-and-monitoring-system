@@ -8,14 +8,14 @@
 #include <ArduinoJson.h>
 
 #define TOKEN "ESP8266_MCU"
-#define DHTPIN 2 //GPIO02 D4 PIN
+#define DHTPIN D7  //GPIO02 D4 PIN in wemos or 2 in nodeMCU
 #define DHTTYPE DHT22
-#define LedPin 14 //GPIO14 D5 PIN
-#define GPIO0 0
-#define GPIO2 2
+#define LedPin D6  //GPIO14 D5 PIN in wemos or 14 in nodeMCU
+#define GPIO0 D3
+#define GPIO2 D5
 
-#define GPIO0_PIN 15
-#define GPIO2_PIN 13
+#define GPIO0_PIN 3
+#define GPIO2_PIN 4
 
 const char* ssid = "UiTiOt-E3.1";
 const char* password = "UiTiOtAP";
@@ -28,7 +28,7 @@ long lastData = 0;
 DHT dht(DHTPIN, DHTTYPE);
 BH1750 lightMeter;
 int automation;
-boolean gpioState[] = {false,false};
+boolean gpioState[] = { false, false };
 
 void setup_wifi() {
 
@@ -56,7 +56,7 @@ void on_message(const char* topic, byte* payload, unsigned int length) {
   Serial.println("On message");
 
   char json[length + 1];
-  strncpy (json, (char*)payload, length);
+  strncpy(json, (char*)payload, length);
   json[length] = '\0';
 
   Serial.print("Topic: ");
@@ -68,8 +68,7 @@ void on_message(const char* topic, byte* payload, unsigned int length) {
   StaticJsonBuffer<200> jsonBuffer;
   JsonObject& data = jsonBuffer.parseObject((char*)json);
 
-  if (!data.success())
-  {
+  if (!data.success()) {
     Serial.println("parseObject() failed");
     return;
   }
@@ -82,9 +81,23 @@ void on_message(const char* topic, byte* payload, unsigned int length) {
     String responseTopic = String(topic);
     responseTopic.replace("request", "response");
     client.publish(responseTopic.c_str(), get_gpio_status().c_str());
-  } else if (methodName.equals("setGpioStatus")) {
+  } else if (methodName.equals("0")) {
     // Update GPIO status and reply
-    set_gpio_status(data["params"]["pin"], data["params"]["enabled"]);
+    set_gpio_status(0, data["params"]);
+    String responseTopic = String(topic);
+    responseTopic.replace("request", "response");
+    client.publish(responseTopic.c_str(), get_gpio_status().c_str());
+    client.publish("v1/devices/me/attributes", get_gpio_status().c_str());
+  } else if (methodName.equals("3")) {
+    // Update GPIO status and reply
+    set_gpio_status(3, data["params"]);
+    String responseTopic = String(topic);
+    responseTopic.replace("request", "response");
+    client.publish(responseTopic.c_str(), get_gpio_status().c_str());
+    client.publish("v1/devices/me/attributes", get_gpio_status().c_str());
+  } else if (methodName.equals("4")) {
+    // Update GPI2 status and reply
+    set_gpio_status(4, data["params"]);
     String responseTopic = String(topic);
     responseTopic.replace("request", "response");
     client.publish(responseTopic.c_str(), get_gpio_status().c_str());
@@ -96,6 +109,8 @@ String get_gpio_status() {
   // Prepare gpios JSON payload string
   StaticJsonBuffer<200> jsonBuffer;
   JsonObject& data = jsonBuffer.createObject();
+  if (gpioState[0] == true && gpioState[1] == true) data[String(0)] = true;
+  else data[String(0)] = false;
   data[String(GPIO0_PIN)] = gpioState[0] ? true : false;
   data[String(GPIO2_PIN)] = gpioState[1] ? true : false;
   char payload[256];
@@ -116,6 +131,13 @@ void set_gpio_status(int pin, boolean enabled) {
     // Output GPIOs state
     digitalWrite(GPIO2, enabled ? HIGH : LOW);
     // Update GPIOs state
+    gpioState[1] = enabled;
+  } else if (pin == 0) {
+    // Output GPIOs state
+    digitalWrite(GPIO0, enabled ? HIGH : LOW);
+    digitalWrite(GPIO2, enabled ? HIGH : LOW);
+    // Update GPIOs state
+    gpioState[0] = enabled;
     gpioState[1] = enabled;
   }
 }
@@ -153,7 +175,12 @@ void setup() {
   pinMode(GPIO2, OUTPUT);
   pinMode(LED_BUILTIN, OUTPUT);
   Wire.begin();  //(SDA, SCL);
-  lightMeter.begin();
+  if (lightMeter.begin()) {
+    Serial.println(F("BH1750 initialised"));
+  }
+  else {
+    Serial.println(F("Error initialising BH1750"));
+  }
   Serial.begin(9600);
   dht.begin();
   setup_wifi();
