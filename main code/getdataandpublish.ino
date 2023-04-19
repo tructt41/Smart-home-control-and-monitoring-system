@@ -1,5 +1,4 @@
 #include <PubSubClient.h>
-#include <SPI.h>
 #include <ESP8266WiFi.h>
 #include <Adafruit_Sensor.h>
 #include <DHT.h>
@@ -31,51 +30,41 @@ int automation;
 boolean gpioState[] = { false, false };
 
 void setup_wifi() {
-
   delay(10);
   Serial.println();
   Serial.print("Connecting to ");
   Serial.println(ssid);
   WiFi.begin(ssid, password);
-
   while (WiFi.status() != WL_CONNECTED) {
-
     delay(500);
     Serial.print(".");
   }
-
   randomSeed(micros());
   Serial.println("");
   Serial.println("WiFi connected");
   Serial.print("IP address: ");
   Serial.println(WiFi.localIP());
 }
+
 // The callback for when a PUBLISH message is received from the server.
 void on_message(const char* topic, byte* payload, unsigned int length) {
-
   Serial.println("On message");
-
   char json[length + 1];
   strncpy(json, (char*)payload, length);
   json[length] = '\0';
-
   Serial.print("Topic: ");
   Serial.println(topic);
   Serial.print("Message: ");
   Serial.println(json);
-
   // Decode JSON request
   StaticJsonBuffer<200> jsonBuffer;
   JsonObject& data = jsonBuffer.parseObject((char*)json);
-
   if (!data.success()) {
     Serial.println("parseObject() failed");
     return;
   }
-
   // Check request method
   String methodName = String((const char*)data["method"]);
-
   if (methodName.equals("getGpioStatus")) {
     // Reply with GPIO status
     String responseTopic = String(topic);
@@ -141,14 +130,11 @@ void set_gpio_status(int pin, boolean enabled) {
     gpioState[1] = enabled;
   }
 }
+
 void reconnect() {
-
   while (!client.connected()) {
-
     Serial.print("Attempting MQTT connection ....");
-
     if (client.connect("ClientID", TOKEN, NULL)) {
-
       Serial.println("Connected to MQTT Broker");
       digitalWrite(LED_BUILTIN, HIGH);
       // Subscribing to receive RPC requests
@@ -156,7 +142,6 @@ void reconnect() {
       Serial.println("Sending current GPIO status ...");
       client.publish("v1/devices/me/attributes", get_gpio_status().c_str());
     }
-
     else {
       Serial.print("failed, rc=");
       Serial.print(client.state());
@@ -168,7 +153,6 @@ void reconnect() {
 }
 
 void setup() {
-
   pinMode(5, OUTPUT);
   pinMode(LedPin, OUTPUT);
   pinMode(GPIO0, OUTPUT);
@@ -177,8 +161,7 @@ void setup() {
   Wire.begin();  //(SDA, SCL);
   if (lightMeter.begin()) {
     Serial.println(F("BH1750 initialised"));
-  }
-  else {
+  } else {
     Serial.println(F("Error initialising BH1750"));
   }
   Serial.begin(9600);
@@ -190,13 +173,10 @@ void setup() {
 }
 
 void loop() {
-
   if (!client.connected()) {
     reconnect();
   }
-
   client.loop();
-
   float t = dht.readTemperature();
   float h = dht.readHumidity();
   uint16_t l = lightMeter.readLightLevel();
@@ -211,15 +191,14 @@ void loop() {
     Serial.println("Failed to read from DHT sensor");
     return;
   }
-    if (l > 2000) {
+  if (l > 2000) {
     Serial.println("Failed to read from Bh1750 sensor");
     return;
-    }
+  }
   String ledstate = String(automation);
   String temperature = String(t);
   String humidity = String(h);
   String intensity = String(l);
-
   String payload = "{\"temperature\":";
   payload += temperature;
   payload += ",\"humidity\":";
@@ -229,12 +208,9 @@ void loop() {
   payload += ",\"led_state\":";
   payload += ledstate;
   payload += "}";
-
   char attributes[1000];
   long now = millis();
-
   if (now - lastData > 5000) {
-
     lastData = now;
     payload.toCharArray(attributes, 1000);
     client.publish(publishTopic, attributes);
